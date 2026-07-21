@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node", "iina-plugin-definition"]
+  },
+  "include": [
+    "tests/**/*.ts",
+    "src/clip-range.ts",
+    "src/dimensions.ts",
+    "src/disk-space.ts",
+    "src/export-confirmation.ts",
+    "src/export-preflight.ts",
+    "src/export-gif.ts",
+    "src/export-mp4.ts",
+    "src/ffmpeg.ts",
+    "src/filenames.ts",
+    "src/media-info.ts",
+    "src/preferences.ts",
+    "src/recorder-state.ts",
+    "src/shortcut.ts",
+    "src/source-fingerprint.ts",
+    "src/types.ts"
+  ]
+}

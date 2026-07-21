@@ -1,0 +1,14 @@
+node_modules/
+.pnpm-store/
+build/
+.test-results/
+test-media/generated/
+*.iinaplgz
+.DS_Store
+._*
+.env
+.env.*
+!.env.example
+*.log
+coverage/
+dist/*.map

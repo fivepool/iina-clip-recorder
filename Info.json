@@ -1,0 +1,32 @@
+{
+  "name": "IINA Clip Recorder",
+  "identifier": "com.inkolor.iina-clip-recorder",
+  "version": "0.4.2",
+  "ghRepo": "fivepool/iina-clip-recorder",
+  "ghVersion": 1,
+  "description": "Mark a range on the media timeline and export it as MP4, GIF, or both.",
+  "author": {
+    "name": "Maksim Arkatov",
+    "url": "https://maksimarkatov.com"
+  },
+  "entry": "dist/index.js",
+  "preferencesPage": "preferences/preferences.html",
+  "permissions": [
+    "show-osd",
+    "video-overlay",
+    "file-system"
+  ],
+  "preferenceDefaults": {
+    "shortcut": "Meta+r",
+    "shortcutNormalized": "Meta+r",
+    "shortcutStatus": "Waiting for an open player window…",
+    "mp4Enabled": true,
+    "mp4WithoutAudio": false,
+    "gifEnabled": false,
+    "mp4Resolution": "1080p",
+    "gifResolution": "720p",
+    "gifFps": "12",
+    "outputDirectory": "~/Movies/IINA Clips",
+    "ffmpegPath": ""
+  }
+}

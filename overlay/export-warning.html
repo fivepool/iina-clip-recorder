@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root { color-scheme: dark; }
+      html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; }
+      body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; pointer-events: none; }
+      .notice {
+        position: absolute;
+        top: calc(18px + env(safe-area-inset-top));
+        left: calc(18px + env(safe-area-inset-left));
+        box-sizing: border-box;
+        width: min(360px, calc(100vw - 36px));
+        padding: 17px 19px 16px;
+        border-radius: 12px;
+        color: #f5f5f7;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background:
+          linear-gradient(145deg, rgba(49, 50, 52, 0.8), rgba(24, 25, 27, 0.74));
+        box-shadow:
+          0 14px 38px rgba(0, 0, 0, 0.34),
+          inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(22px) saturate(135%);
+        -webkit-backdrop-filter: blur(22px) saturate(135%);
+      }
+      h1 { margin: 0; font-size: 20px; line-height: 1.2; font-weight: 650; letter-spacing: -0.018em; }
+      p { margin: 7px 0 0; color: rgba(245, 245, 247, 0.7); font-size: 12px; line-height: 1.4; font-weight: 450; white-space: pre-line; }
+      .warning { color: rgba(255, 204, 0, 0.88); }
+      .actions { display: flex; gap: 22px; margin-top: 17px; }
+      button {
+        padding: 0;
+        border: 0;
+        color: rgba(245, 245, 247, 0.72);
+        background: transparent;
+        font: inherit;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.045em;
+        text-transform: uppercase;
+        cursor: pointer;
+        pointer-events: auto;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      button:hover, button:focus-visible {
+        color: #fff;
+        outline: none;
+        text-shadow: 0 0 12px rgba(255, 255, 255, 0.18);
+      }
+      button:disabled { color: rgba(245, 245, 247, 0.35); cursor: default; }
+      @media (max-height: 220px) {
+        .notice {
+          top: calc(8px + env(safe-area-inset-top));
+          left: calc(8px + env(safe-area-inset-left));
+          width: min(360px, calc(100vw - 16px));
+          padding: 10px 12px;
+          border-radius: 9px;
+        }
+        h1 { font-size: 16px; }
+        p { margin-top: 3px; font-size: 11px; line-height: 1.25; }
+        .actions { margin-top: 8px; }
+        button { font-size: 11px; }
+      }
+    </style>
+  </head>
+  <body>
+    <section class="notice" role="dialog" aria-modal="false" aria-labelledby="title">
+      <h1 id="title">Review export</h1>
+      <p id="duration"></p>
+      <p id="estimates"></p>
+      <p id="disk"></p>
+      <p id="warning" class="warning"></p>
+      <div class="actions">
+        <button id="confirm" type="button" data-clickable>Export</button>
+        <button id="cancel" type="button" data-clickable>Cancel</button>
+      </div>
+    </section>
+    <script>
+      (function () {
+        "use strict";
+        var title = document.getElementById("title");
+        var duration = document.getElementById("duration");
+        var estimates = document.getElementById("estimates");
+        var disk = document.getElementById("disk");
+        var warning = document.getElementById("warning");
+        var confirm = document.getElementById("confirm");
+        var cancel = document.getElementById("cancel");
+        var submitted = false;
+
+        function text(payload, key, fallback) {
+          return payload && typeof payload[key] === "string" ? payload[key] : fallback;
+        }
+        function submit(message) {
+          if (submitted) return;
+          submitted = true;
+          confirm.disabled = true;
+          cancel.disabled = true;
+          iina.postMessage(message, null);
+        }
+
+        iina.onMessage("clip-recorder-show-export-warning", function (payload) {
+          title.textContent = text(payload, "title", "Review export");
+          duration.textContent = text(payload, "duration", "");
+          estimates.textContent = text(payload, "estimates", "");
+          disk.textContent = text(payload, "disk", "");
+          warning.textContent = text(payload, "warning", "");
+          confirm.textContent = text(payload, "confirmLabel", "Export");
+          cancel.textContent = text(payload, "cancelLabel", "Cancel");
+        });
+        confirm.addEventListener("click", function () {
+          submit("clip-recorder-confirm-export");
+        });
+        cancel.addEventListener("click", function () {
+          submit("clip-recorder-cancel-export");
+        });
+      })();
+    </script>
+  </body>
+</html>

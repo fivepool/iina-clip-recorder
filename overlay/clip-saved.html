@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root { color-scheme: dark; }
+      html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; }
+      body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; pointer-events: none; }
+      .notice {
+        position: absolute;
+        top: calc(18px + env(safe-area-inset-top));
+        left: calc(18px + env(safe-area-inset-left));
+        box-sizing: border-box;
+        width: min(340px, calc(100vw - 36px));
+        min-height: 112px;
+        padding: 17px 19px 16px;
+        border-radius: 12px;
+        color: #f5f5f7;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background:
+          linear-gradient(145deg, rgba(49, 50, 52, 0.8), rgba(24, 25, 27, 0.74));
+        box-shadow:
+          0 14px 38px rgba(0, 0, 0, 0.34),
+          inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(22px) saturate(135%);
+        -webkit-backdrop-filter: blur(22px) saturate(135%);
+      }
+      h1 { margin: 0; font-size: 20px; line-height: 1.2; font-weight: 650; letter-spacing: -0.018em; }
+      p { margin: 6px 0 0; color: rgba(245, 245, 247, 0.62); font-size: 12px; line-height: 1.35; font-weight: 450; }
+      button {
+        margin: 17px 0 0;
+        padding: 0;
+        border: 0;
+        color: rgba(245, 245, 247, 0.72);
+        background: transparent;
+        font: inherit;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.045em;
+        text-transform: uppercase;
+        cursor: pointer;
+        pointer-events: auto;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      button:hover, button:focus-visible {
+        color: #fff;
+        outline: none;
+        text-shadow: 0 0 12px rgba(255, 255, 255, 0.18);
+      }
+    </style>
+  </head>
+  <body>
+    <section class="notice" aria-live="polite">
+      <h1 id="title">Clip saved</h1>
+      <p id="detail"></p>
+      <button id="reveal" type="button" data-clickable>Reveal in Finder</button>
+    </section>
+    <script>
+      (function () {
+        "use strict";
+        var title = document.getElementById("title");
+        var detail = document.getElementById("detail");
+        var reveal = document.getElementById("reveal");
+
+        iina.onMessage("clip-recorder-show-saved", function (payload) {
+          title.textContent = typeof payload.title === "string" ? payload.title : "Clip saved";
+          detail.textContent = typeof payload.detail === "string" ? payload.detail : "";
+          reveal.textContent = typeof payload.actionLabel === "string" ? payload.actionLabel : "Reveal in Finder";
+        });
+        reveal.addEventListener("click", function () {
+          // IINA 1.4.4 serializes the second argument with JSON.stringify.
+          // Passing no payload produces undefined and the WKWebView bridge
+          // silently drops the message, so always send an explicit JSON value.
+          iina.postMessage("clip-recorder-reveal", null);
+        });
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IINA Clip Recorder Preferences</title>
+    <link rel="stylesheet" href="preferences.css" />
+    <script src="preferences-core.js"></script>
+    <script src="preferences.js" defer></script>
+  </head>
+  <body>
+    <main class="preferences" aria-labelledby="page-title">
+      <header class="page-header">
+        <h1 id="page-title">IINA Clip Recorder</h1>
+        <p class="secondary">
+          Export settings are captured when a new clip selection starts.
+          Shortcut changes reach open player windows in about one second.
+        </p>
+      </header>
+
+      <section class="pref-section" aria-labelledby="shortcut-heading">
+        <h2 id="shortcut-heading">Shortcut</h2>
+        <label class="field-label" for="shortcut">Start or stop selection</label>
+        <input
+          id="shortcut"
+          class="text-field shortcut-field"
+          type="text"
+          value="Meta+r"
+          placeholder="Cmd+R"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+          aria-describedby="shortcut-help shortcut-validation"
+        />
+        <p id="shortcut-validation" class="validation-message" aria-live="polite"></p>
+        <p id="shortcut-help" class="small secondary pref-help">
+          Enter one modified key, for example Cmd+R, Command+R, ⌘R, or
+          Ctrl+Alt+C. Command aliases are stored canonically as Meta. A changed
+          shortcut takes effect after restarting IINA or reloading the plugin.
+        </p>
+        <div class="runtime-status" aria-live="polite">
+          <span class="status-label">Runtime status</span>
+          <span id="shortcut-status" class="status-value status-pending">
+            Waiting for a player window…
+          </span>
+        </div>
+      </section>
+
+      <section class="pref-section" aria-labelledby="formats-heading">
+        <h2 id="formats-heading">Output formats</h2>
+        <label class="choice-row">
+          <input
+            id="mp4-enabled"
+            type="checkbox"
+            checked
+            aria-describedby="formats-help formats-validation"
+          />
+          <span>MP4</span>
+        </label>
+        <label class="choice-row">
+          <input
+            id="gif-enabled"
+            type="checkbox"
+            aria-describedby="formats-help formats-validation"
+          />
+          <span>GIF</span>
+        </label>
+        <p
+          id="formats-validation"
+          class="validation-message"
+          aria-live="polite"
+        ></p>
+        <p id="formats-help" class="small secondary pref-help">
+          Enable MP4, GIF, or both. At least one output format must remain
+          enabled.
+        </p>
+      </section>
+
+      <section class="pref-section" aria-labelledby="mp4-heading">
+        <h2 id="mp4-heading">MP4 resolution</h2>
+        <fieldset class="choice-group" aria-label="MP4 resolution">
+          <label class="choice-row">
+            <input type="radio" name="mp4-resolution" value="1080p" />
+            <span>1080p</span>
+          </label>
+          <label class="choice-row">
+            <input type="radio" name="mp4-resolution" value="full" />
+            <span>Full Resolution</span>
+          </label>
+        </fieldset>
+        <p class="small secondary pref-help">
+          1080p fits the video inside 1920×1080 without upscaling. Full
+          Resolution preserves the source display size.
+        </p>
+        <label class="choice-row">
+          <input id="mp4-without-audio" type="checkbox" />
+          <span>Export without audio</span>
+        </label>
+        <p class="small secondary pref-help">
+          When enabled, MP4 clips contain video only. This does not affect GIF.
+        </p>
+      </section>
+
+      <section class="pref-section" aria-labelledby="gif-heading">
+        <h2 id="gif-heading">GIF options</h2>
+        <div class="gif-controls">
+          <fieldset class="choice-group" aria-label="GIF resolution">
+            <legend>Resolution</legend>
+            <label class="choice-row">
+              <input type="radio" name="gif-resolution" value="720p" />
+              <span>720p</span>
+            </label>
+            <label class="choice-row">
+              <input type="radio" name="gif-resolution" value="full" />
+              <span>Full Resolution</span>
+            </label>
+          </fieldset>
+          <fieldset class="choice-group" aria-label="GIF frame rate">
+            <legend>Frame rate</legend>
+            <label class="choice-row">
+              <input type="radio" name="gif-fps" value="12" />
+              <span>12 fps</span>
+            </label>
+            <label class="choice-row">
+              <input type="radio" name="gif-fps" value="source" />
+              <span>Match Source</span>
+            </label>
+          </fieldset>
+        </div>
+        <p class="small secondary pref-help">
+          Full-resolution, source-rate GIFs can be extremely large and may take
+          substantially longer to encode.
+        </p>
+      </section>
+
+      <section class="pref-section" aria-labelledby="destination-heading">
+        <h2 id="destination-heading">Destination</h2>
+        <label class="field-label" for="output-directory">Output directory</label>
+        <input
+          id="output-directory"
+          class="text-field path-field"
+          type="text"
+          placeholder="~/Movies/IINA Clips"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+          aria-describedby="output-directory-help output-directory-validation"
+        />
+        <p
+          id="output-directory-validation"
+          class="validation-message"
+          aria-live="polite"
+        ></p>
+        <p id="output-directory-help" class="small secondary pref-help">
+          Use ~, a path beginning with ~/, or an absolute path beginning with /.
+          The directory is created when an export starts.
+        </p>
+      </section>
+
+      <section class="pref-section" aria-labelledby="ffmpeg-heading">
+        <h2 id="ffmpeg-heading">FFmpeg</h2>
+        <label class="field-label" for="ffmpeg-path">Custom executable path</label>
+        <input
+          id="ffmpeg-path"
+          class="text-field path-field"
+          type="text"
+          placeholder="Auto-detect"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+          aria-describedby="ffmpeg-path-help ffmpeg-path-validation"
+        />
+        <p id="ffmpeg-path-validation" class="validation-message" aria-live="polite"></p>
+        <p id="ffmpeg-path-help" class="small secondary pref-help">
+          Leave blank to auto-detect FFmpeg, or enter a path beginning with ~/
+          or /. The executable is checked when the next clip selection starts.
+        </p>
+      </section>
+
+      <p id="bridge-error" class="bridge-error" role="alert" hidden>
+        IINA did not expose the preferences bridge. Close and reopen this
+        Preferences tab.
+      </p>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,51 @@
+{
+  "name": "iina-clip-recorder",
+  "version": "0.4.2",
+  "private": true,
+  "description": "Clip export plugin for IINA 1.4.4",
+  "author": {
+    "name": "Maksim Arkatov",
+    "url": "https://maksimarkatov.com"
+  },
+  "homepage": "https://github.com/fivepool/iina-clip-recorder#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fivepool/iina-clip-recorder.git"
+  },
+  "bugs": {
+    "url": "https://github.com/fivepool/iina-clip-recorder/issues"
+  },
+  "keywords": [
+    "iina",
+    "iina-plugin",
+    "ffmpeg",
+    "video",
+    "gif",
+    "macos"
+  ],
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@11.7.0",
+  "scripts": {
+    "build": "./node_modules/esbuild/bin/esbuild src/main.ts --bundle --format=iife --platform=neutral --target=safari13 --charset=utf8 --legal-comments=none --outfile=dist/index.js",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck:tests": "tsc --noEmit -p tsconfig.tests.json",
+    "test": "tsx --test tests/*.test.ts",
+    "check": "sh scripts/check.sh",
+    "link": "sh scripts/link-dev.sh",
+    "unlink": "sh scripts/unlink-dev.sh",
+    "pack": "sh scripts/pack.sh",
+    "fixtures:generate": "sh scripts/generate-test-media.sh",
+    "fixtures:verify": "node scripts/verify-test-media.mjs",
+    "test:media": "tsx tests/media-integration.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "esbuild": "^0.25.0",
+    "iina-plugin-definition": "0.99.3",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}
