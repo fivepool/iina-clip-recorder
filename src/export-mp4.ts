@@ -126,7 +126,7 @@ export function buildMp4Args(
     // Preserve the demuxer's time base for VFR instead of quantizing encoder
     // timestamps to the inverse nominal frame rate.
     "-enc_time_base:v",
-    "-1",
+    "demux",
     ...(shouldEncodeAudio ? ["-c:a", "aac", "-b:a", "192k"] : []),
     "-movflags",
     "+faststart",
@@ -136,6 +136,9 @@ export function buildMp4Args(
 
 export function shouldFallbackToLibx264(stderr: string): boolean {
   const normalized = stderr.toLowerCase();
+  if (normalized.includes("invalid time base")) {
+    return false;
+  }
   return [
     "h264_videotoolbox",
     "videotoolbox",
@@ -175,6 +178,9 @@ export function describeFfmpegFailure(
     stderr.includes("unknown decoder")
   ) {
     return "FFmpeg could not decode this source. See the IINA log for details.";
+  }
+  if (stderr.includes("invalid time base")) {
+    return "FFmpeg rejected the video timestamp settings. Update IINA Clip Recorder or use a compatible FFmpeg build.";
   }
   if (exhaustedEncoders && stderr.includes("unknown encoder")) {
     return "This FFmpeg build has neither a usable VideoToolbox nor libx264 H.264 encoder.";

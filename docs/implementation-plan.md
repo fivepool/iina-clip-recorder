@@ -13,7 +13,7 @@
 - [ ] Финальный release gate — оставшаяся ручная GIF/dual/UI/error matrix
   в IINA 1.4.4. Clean-install baseline и packaged MP4 smoke уже пройдены.
 
-Текущий public beta target: `0.4.2`.
+Текущий public beta target: `0.4.3`.
 
 UI overlay в `0.4.2` приведён к единому умеренно матовому glass-стилю без
 добавления новых элементов или сообщений.
@@ -69,8 +69,9 @@ preview и действиями. Публичного plugin API для её с�
 | Filename | basename absolute path, sanitized и UTF-8 bounded |
 
 VFR нельзя определить одним FPS. MP4 сохраняет timestamps через
-`-fps_mode:v passthrough -enc_time_base:v -1`; integration gate сравнивает
-frame PTS.
+`-fps_mode:v passthrough -enc_time_base:v demux`; integration gate сравнивает
+frame PTS. Строковое значение `demux` заменило устаревшее числовое `-1` и
+совместимо с текущими Homebrew FFmpeg 8.x.
 
 ## FFmpeg discovery
 

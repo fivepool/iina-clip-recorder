@@ -17,7 +17,7 @@ Tested with IINA 1.4.4 build 168 on macOS.
 ## Requirements
 
 - macOS and IINA.
-- [FFmpeg](https://ffmpeg.org/) installed separately.
+- [FFmpeg](https://ffmpeg.org/) 6.1 or newer, installed separately.
 
 With Homebrew:
 

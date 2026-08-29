@@ -1,6 +1,6 @@
 # Известные ограничения
 
-Актуально для IINA Clip Recorder `0.4.2`, IINA 1.4.4 build 168.
+Актуально для IINA Clip Recorder `0.4.3`, IINA 1.4.4 build 168.
 
 ## Источники
 
@@ -44,6 +44,8 @@
 
 - IINA содержит FFmpeg libraries, но не предоставляет plugin API или
   executable для transcoding; нужен внешний FFmpeg.
+- Версия `0.4.3` требует FFmpeg 6.1 или новее: MP4 использует строковое
+  `-enc_time_base:v demux`, заменившее устаревшее числовое значение `-1`.
 - Bare-name PATH lookup в IINA 1.4.4 ненадёжен, поэтому используются
   подтверждённые absolute candidates.
 - `iina.utils.exec` не возвращает PID и не предоставляет cancellation.
