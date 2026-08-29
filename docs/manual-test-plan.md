@@ -18,7 +18,7 @@
 
 Ни одна метка не означает `PASS`. Фактический статус каждого теста нужно записывать отдельно.
 
-Текущий target — Stage 5, версия `0.4.2`. В таблице ниже отдельно зафиксировано
+Текущий target — Stage 5, версия `0.4.3`. В таблице ниже отдельно зафиксировано
 автоматическое покрытие и частичный live smoke через development link.
 Частичный smoke не заменяет полного прогона сценария: такой сценарий остаётся
 `NOT RUN` полностью, пока не выполнены все его шаги.
@@ -38,6 +38,7 @@
 | MTP-052 confirmation cancel | `PASS (PARTIAL LIVE)` | `Cancel` вернул idle и не создал файл; кнопки остались доступны даже в player window высотой около 160 px. Source/window/double-click ветви ещё не выполнены |
 | Остальная MTP-001–MTP-053 matrix | `NOT RUN` полностью | Автоматические Node/FFmpeg тесты и частичный smoke не заменяют полный player lifecycle/UI прогон |
 | MTP-050 clean install `0.4.2` | `PARTIAL (LIVE SMOKE)` | Финальный 34 KB package установлен без development link: permissions prompt, version, identifier, author, GitHub source/update metadata и Preferences загрузились; packaged MP4/GIF runtime остаётся отдельным gate |
+| FFmpeg 8 time-base regression | `PASS (AUTOMATED)` | MP4 integration использует `-enc_time_base:v demux`; современный Homebrew FFmpeg больше не получает устаревшее числовое `-1` |
 
 ## 2. Тестовое окружение
 

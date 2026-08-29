@@ -128,7 +128,7 @@ output pixels × estimated frames × 0.30 bytes/pixel-frame
 - SAR-aware 1920×1080 scale без upscale либо even Full Resolution;
 - `h264_videotoolbox`, 7000k, yuv420p, avc1;
 - `-fps_mode:v passthrough`;
-- `-enc_time_base:v -1`;
+- `-enc_time_base:v demux`;
 - AAC 192k;
 - `+faststart`.
 
@@ -256,12 +256,12 @@ src/notifications.ts        result models/messages
 - repository README;
 - FFmpeg.
 
-Manifest `0.4.2`:
+Manifest `0.4.3`:
 
 ```text
 identifier: com.inkolor.iina-clip-recorder
 ghRepo: fivepool/iina-clip-recorder
-ghVersion: 1
+ghVersion: 2
 author: Maksim Arkatov
 url: https://maksimarkatov.com
 ```

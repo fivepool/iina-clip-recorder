@@ -235,7 +235,7 @@ test("builds MP4 args as a shell-free argv with source timing and optional audio
   assert.ok(args.includes("0:a:0"));
   assert.ok(args.includes("h264_videotoolbox"));
   assert.ok(args.includes("passthrough"));
-  assert.equal(args[args.indexOf("-enc_time_base:v") + 1], "-1");
+  assert.equal(args[args.indexOf("-enc_time_base:v") + 1], "demux");
   assert.equal(args.includes("-r"), false);
   assert.equal(args.includes("-c"), false);
 
@@ -593,6 +593,12 @@ test("builds libx264 fallback args and classifies encoder failures", () => {
     true,
   );
   assert.equal(shouldFallbackToLibx264("No space left on device"), false);
+  assert.equal(
+    shouldFallbackToLibx264(
+      "[vost#0:0/h264_videotoolbox] Invalid time base: demux",
+    ),
+    false,
+  );
   assert.match(
     describeFfmpegFailure(
       [{ status: 1, stdout: "", stderr: "No space left on device" }],
@@ -609,6 +615,13 @@ test("builds libx264 fallback args and classifies encoder failures", () => {
       true,
     ),
     /neither a usable videotoolbox nor libx264/i,
+  );
+  assert.match(
+    describeFfmpegFailure(
+      [{ status: 234, stdout: "", stderr: "Invalid time base: -1" }],
+      true,
+    ),
+    /timestamp settings/i,
   );
 });
 
