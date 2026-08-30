@@ -1,6 +1,6 @@
 {
   "name": "iina-clip-recorder",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "private": true,
   "description": "Clip export plugin for IINA 1.4.4",
   "author": {

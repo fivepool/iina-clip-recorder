@@ -2,6 +2,10 @@ import {
   buildEvenFullResolutionFilter,
   buildSarAwareScaleFilter,
 } from "./dimensions";
+import {
+  sanitizeReservedColorTransfer,
+  shouldSanitizeReservedColorTransfer,
+} from "./color-metadata";
 import type { Mp4Resolution } from "./preferences";
 import type { ClipRange } from "./types";
 
@@ -55,13 +59,17 @@ function formatSeconds(value: number): string {
 export function buildMp4Args(
   input: Mp4CommandInput,
   encoder: Mp4Encoder,
+  repairReservedColorTransfer = false,
 ): string[] {
   const maximumWidth = input.maximumWidth ?? 1920;
   const maximumHeight = input.maximumHeight ?? 1080;
-  const videoFilter =
+  const scaleFilter =
     (input.resolution ?? "1080p") === "full"
       ? buildEvenFullResolutionFilter()
       : buildSarAwareScaleFilter(maximumWidth, maximumHeight);
+  const videoFilter = repairReservedColorTransfer
+    ? sanitizeReservedColorTransfer(scaleFilter)
+    : scaleFilter;
   const encoderArgs =
     encoder === "h264_videotoolbox"
       ? [
@@ -195,12 +203,25 @@ export async function exportMp4(
   runtime: Mp4ExportRuntime,
 ): Promise<Mp4ExportResult> {
   const attempts: ProcessResult[] = [];
-  await runtime.verifySource?.();
-  const hardwareResult = await runtime.run(
-    buildMp4Args(input, "h264_videotoolbox"),
-    "h264_videotoolbox",
-  );
-  attempts.push(hardwareResult);
+  const runEncoder = async (encoder: Mp4Encoder): Promise<ProcessResult> => {
+    await runtime.verifySource?.();
+    let result = await runtime.run(buildMp4Args(input, encoder), encoder);
+    attempts.push(result);
+
+    if (
+      result.status !== 0 &&
+      shouldSanitizeReservedColorTransfer(result.stderr)
+    ) {
+      runtime.cleanupTemporaryFile();
+      await runtime.verifySource?.();
+      result = await runtime.run(buildMp4Args(input, encoder, true), encoder);
+      attempts.push(result);
+    }
+
+    return result;
+  };
+
+  const hardwareResult = await runEncoder("h264_videotoolbox");
 
   if (hardwareResult.status === 0) {
     await runtime.promoteTemporaryFile();
@@ -216,12 +237,7 @@ export async function exportMp4(
   }
 
   runtime.onSoftwareFallback?.();
-  await runtime.verifySource?.();
-  const softwareResult = await runtime.run(
-    buildMp4Args(input, "libx264"),
-    "libx264",
-  );
-  attempts.push(softwareResult);
+  const softwareResult = await runEncoder("libx264");
 
   if (softwareResult.status !== 0) {
     runtime.cleanupTemporaryFile();

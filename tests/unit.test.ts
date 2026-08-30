@@ -10,6 +10,7 @@ import {
   buildSarAwareScaleFilter,
   calculateBoundedDimensions,
 } from "../src/dimensions";
+import { shouldSanitizeReservedColorTransfer } from "../src/color-metadata";
 import {
   assessDiskSpace,
   parsePosixDf,
@@ -264,6 +265,24 @@ test("builds MP4 args as a shell-free argv with source timing and optional audio
   const fullFilter = fullArgs[fullArgs.indexOf("-vf") + 1];
   assert.match(fullFilter ?? "", /trunc\(iw\/2\)/);
   assert.doesNotMatch(fullFilter ?? "", /1920/);
+
+  const repairedArgs = buildMp4Args(
+    {
+      sourcePath: "/tmp/reserved-transfer.mov",
+      temporaryOutputPath: "/tmp/repaired.mp4",
+      range,
+    },
+    "libx264",
+    true,
+  );
+  assert.match(
+    repairedArgs[repairedArgs.indexOf("-vf") + 1] ?? "",
+    /^setparams=color_trc=unknown,scale=/,
+  );
+  assert.doesNotMatch(
+    args[args.indexOf("-vf") + 1] ?? "",
+    /setparams=color_trc=/,
+  );
 });
 
 test("builds deterministic, range-bounded two-pass GIF argv", () => {
@@ -310,6 +329,17 @@ test("builds deterministic, range-bounded two-pass GIF argv", () => {
     /\[gif_frames\]\[1:v:0\]paletteuse=dither=sierra2_4a:diff_mode=rectangle\[gif\]$/,
   );
   assert.equal(encodeArgs[encodeArgs.indexOf("-map") + 1], "[gif]");
+
+  const repairedPalette = buildGifPaletteArgs(input, true);
+  assert.match(
+    repairedPalette[repairedPalette.indexOf("-vf") + 1] ?? "",
+    /^setparams=color_trc=unknown,fps=fps=12,/,
+  );
+  const repairedEncode = buildGifEncodeArgs(input, true);
+  assert.match(
+    repairedEncode[repairedEncode.indexOf("-filter_complex") + 1] ?? "",
+    /^\[0:v:0\]setparams=color_trc=unknown,fps=fps=12,/,
+  );
 });
 
 test("builds Full Resolution and Match Source GIF filters without forced FPS", () => {
@@ -375,6 +405,39 @@ test("classifies actionable GIF export failures", () => {
   );
 });
 
+test("recognizes only the reserved-transfer swscale compatibility failure", () => {
+  assert.equal(
+    shouldSanitizeReservedColorTransfer(
+      "Unsupported input (Operation not supported): fmt:yuv422p10le csp:bt709 prim:bt709 trc:(null) -> fmt:yuv420p csp:bt709 prim:bt709 trc:(null)",
+    ),
+    true,
+  );
+  assert.equal(
+    shouldSanitizeReservedColorTransfer(
+      "Unsupported input (Operation not supported): fmt:yuv422p10le csp:bt709 prim:bt709 trc:reserved -> fmt:yuv420p csp:bt709 prim:bt709 trc:reserved",
+    ),
+    true,
+  );
+  assert.equal(
+    shouldSanitizeReservedColorTransfer(
+      "Unsupported input: fmt:yuv420p csp:bt2020 prim:bt2020 trc:smpte2084 -> fmt:yuv420p trc:reserved",
+    ),
+    false,
+  );
+  assert.equal(
+    shouldSanitizeReservedColorTransfer(
+      "Unsupported input: fmt:yuv422p10le csp:bt2020 prim:bt2020 trc:reserved -> fmt:yuv420p csp:bt2020 prim:bt2020 trc:reserved",
+    ),
+    false,
+  );
+  assert.equal(
+    shouldSanitizeReservedColorTransfer(
+      "VideoToolbox compression session failed: Invalid time base: demux",
+    ),
+    false,
+  );
+});
+
 test("runs both GIF passes, stops after a palette failure and always cleans up", async () => {
   let promoted = 0;
   let cleaned = 0;
@@ -436,6 +499,107 @@ test("runs both GIF passes, stops after a palette failure and always cleans up",
   assert.equal(promoted, 1);
   assert.equal(cleaned, 2);
   assert.equal(verified, 3);
+});
+
+test("retries the complete GIF workflow after a reserved-transfer failure", async () => {
+  const input = {
+    sourcePath: "/tmp/reserved-transfer.mov",
+    temporaryOutputPath: "/tmp/output.gif",
+    temporaryPalettePath: "/tmp/palette.png",
+    range,
+    resolution: "720p" as const,
+    frameRate: "12" as const,
+  };
+  const phases: string[] = [];
+  const filters: string[] = [];
+  let cleaned = 0;
+  let promoted = 0;
+  let verified = 0;
+
+  await exportGif(input, {
+    async run(args, phase) {
+      phases.push(phase);
+      const option = phase === "palette" ? "-vf" : "-filter_complex";
+      filters.push(args[args.indexOf(option) + 1] ?? "");
+      if (phases.length === 1) {
+        return {
+          status: 211,
+          stdout: "",
+          stderr:
+            "Unsupported input: fmt:yuv422p10le csp:bt709 prim:bt709 trc:reserved -> fmt:bgra csp:gbr prim:bt709 trc:reserved",
+        };
+      }
+      return { status: 0, stdout: "", stderr: "" };
+    },
+    cleanupTemporaryFiles() {
+      cleaned += 1;
+    },
+    async promoteTemporaryFile() {
+      promoted += 1;
+    },
+    async verifySource() {
+      verified += 1;
+    },
+  });
+
+  assert.deepEqual(phases, ["palette", "palette", "encode"]);
+  assert.doesNotMatch(filters[0] ?? "", /setparams=color_trc=/);
+  assert.match(filters[1] ?? "", /setparams=color_trc=unknown/);
+  assert.match(filters[2] ?? "", /setparams=color_trc=unknown/);
+  assert.equal(cleaned, 2);
+  assert.equal(promoted, 1);
+  assert.equal(verified, 3);
+});
+
+test("restarts both GIF passes when the encode pass finds reserved transfer metadata", async () => {
+  const input = {
+    sourcePath: "/tmp/reserved-transfer.mov",
+    temporaryOutputPath: "/tmp/output.gif",
+    temporaryPalettePath: "/tmp/palette.png",
+    range,
+    resolution: "720p" as const,
+    frameRate: "12" as const,
+  };
+  const phases: string[] = [];
+  const filters: string[] = [];
+  let cleaned = 0;
+  let promoted = 0;
+  let verified = 0;
+
+  await exportGif(input, {
+    async run(args, phase) {
+      phases.push(phase);
+      const option = phase === "palette" ? "-vf" : "-filter_complex";
+      filters.push(args[args.indexOf(option) + 1] ?? "");
+      if (phases.length === 2) {
+        return {
+          status: 211,
+          stdout: "",
+          stderr:
+            "Unsupported input: fmt:yuv422p10le csp:bt709 prim:bt709 trc:reserved -> fmt:bgra csp:gbr prim:bt709 trc:reserved",
+        };
+      }
+      return { status: 0, stdout: "", stderr: "" };
+    },
+    cleanupTemporaryFiles() {
+      cleaned += 1;
+    },
+    async promoteTemporaryFile() {
+      promoted += 1;
+    },
+    async verifySource() {
+      verified += 1;
+    },
+  });
+
+  assert.deepEqual(phases, ["palette", "encode", "palette", "encode"]);
+  assert.doesNotMatch(filters[0] ?? "", /setparams=color_trc=/);
+  assert.doesNotMatch(filters[1] ?? "", /setparams=color_trc=/);
+  assert.match(filters[2] ?? "", /setparams=color_trc=unknown/);
+  assert.match(filters[3] ?? "", /setparams=color_trc=unknown/);
+  assert.equal(cleaned, 2);
+  assert.equal(promoted, 1);
+  assert.equal(verified, 4);
 });
 
 test("canonicalizes configurable shortcuts and renders macOS notation", () => {
@@ -658,6 +822,93 @@ test("rechecks the source before MP4 software fallback", async () => {
   assert.deepEqual(encoders, ["h264_videotoolbox", "libx264"]);
   assert.equal(verified, 2);
   assert.equal(promoted, 1);
+});
+
+test("retries reserved transfer metadata before changing MP4 encoders", async () => {
+  const encoders: string[] = [];
+  const filters: string[] = [];
+  let cleaned = 0;
+  let verified = 0;
+
+  await exportMp4(
+    {
+      sourcePath: "/tmp/reserved-transfer.mov",
+      temporaryOutputPath: "/tmp/output.mp4",
+      range,
+    },
+    {
+      async run(args, encoder) {
+        encoders.push(encoder);
+        filters.push(args[args.indexOf("-vf") + 1] ?? "");
+        return encoders.length === 1
+          ? {
+              status: 211,
+              stdout: "",
+              stderr:
+                "Unsupported input: fmt:yuv422p10le csp:bt709 prim:bt709 trc:(null) -> fmt:yuv420p csp:bt709 prim:bt709 trc:(null)",
+            }
+          : { status: 0, stdout: "", stderr: "" };
+      },
+      cleanupTemporaryFile() {
+        cleaned += 1;
+      },
+      async promoteTemporaryFile() {},
+      async verifySource() {
+        verified += 1;
+      },
+    },
+  );
+
+  assert.deepEqual(encoders, ["h264_videotoolbox", "h264_videotoolbox"]);
+  assert.doesNotMatch(filters[0] ?? "", /setparams=color_trc=/);
+  assert.match(filters[1] ?? "", /^setparams=color_trc=unknown,/);
+  assert.equal(cleaned, 1);
+  assert.equal(verified, 2);
+});
+
+test("repairs reserved transfer metadata after MP4 software fallback", async () => {
+  const encoders: string[] = [];
+  const filters: string[] = [];
+
+  await exportMp4(
+    {
+      sourcePath: "/tmp/reserved-transfer.mov",
+      temporaryOutputPath: "/tmp/output.mp4",
+      range,
+    },
+    {
+      async run(args, encoder) {
+        encoders.push(encoder);
+        filters.push(args[args.indexOf("-vf") + 1] ?? "");
+        if (encoders.length === 1) {
+          return {
+            status: 1,
+            stdout: "",
+            stderr: "VideoToolbox compression session failed",
+          };
+        }
+        if (encoders.length === 2) {
+          return {
+            status: 211,
+            stdout: "",
+            stderr:
+              "Unsupported input: fmt:yuv422p10le csp:bt709 prim:bt709 trc:reserved -> fmt:yuv420p csp:bt709 prim:bt709 trc:reserved",
+          };
+        }
+        return { status: 0, stdout: "", stderr: "" };
+      },
+      cleanupTemporaryFile() {},
+      async promoteTemporaryFile() {},
+    },
+  );
+
+  assert.deepEqual(encoders, [
+    "h264_videotoolbox",
+    "libx264",
+    "libx264",
+  ]);
+  assert.doesNotMatch(filters[1] ?? "", /setparams=color_trc=/);
+  assert.match(filters[2] ?? "", /^setparams=color_trc=unknown,/);
 });
 
 test("maps the selected embedded audio stream by FFmpeg stream index", () => {
