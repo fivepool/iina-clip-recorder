@@ -614,6 +614,32 @@ ${redact(result.stderr, redactions)}`
     return `scale=w='${width}':h='${height}':flags=lanczos`;
   }
 
+  // src/color-metadata.ts
+  var UNSUPPORTED_INPUT_MARKER = "unsupported input";
+  function shouldSanitizeReservedColorTransfer(stderr) {
+    const normalized = stderr.toLowerCase();
+    let searchFrom = 0;
+    while (searchFrom < normalized.length) {
+      const marker = normalized.indexOf(UNSUPPORTED_INPUT_MARKER, searchFrom);
+      if (marker < 0) {
+        return false;
+      }
+      const arrow = normalized.indexOf("->", marker);
+      if (arrow < 0) {
+        return false;
+      }
+      const inputDescription = normalized.slice(marker, arrow);
+      if ((inputDescription.includes("trc:reserved") || inputDescription.includes("trc:(null)")) && inputDescription.includes("csp:bt709") && inputDescription.includes("prim:bt709")) {
+        return true;
+      }
+      searchFrom = arrow + 2;
+    }
+    return false;
+  }
+  function sanitizeReservedColorTransfer(filter) {
+    return `setparams=color_trc=unknown,${filter}`;
+  }
+
   // src/export-gif.ts
   var GifExportError = class extends Error {
     constructor(message, result, phase) {
@@ -630,19 +656,19 @@ ${redact(result.stderr, redactions)}`
     const factor = "min(1,1/sar)";
     return `scale=w='max(1,round(iw*sar*${factor}))':h='max(1,round(ih*${factor}))':flags=lanczos,setsar=1`;
   }
-  function buildGifProcessingFilter(resolution, frameRate) {
+  function buildGifProcessingFilter(resolution, frameRate, repairReservedColorTransfer = false) {
     const scaleFilter = resolution === "720p" ? buildSarAwareScaleFilter(1280, 720) : buildGifFullResolutionFilter();
     const processingFilters = frameRate === "12" ? `fps=fps=12,${scaleFilter}` : scaleFilter;
-    return processingFilters;
+    return repairReservedColorTransfer ? sanitizeReservedColorTransfer(processingFilters) : processingFilters;
   }
-  function buildGifPaletteFilter(resolution, frameRate) {
-    return `${buildGifProcessingFilter(resolution, frameRate)},palettegen=max_colors=256:stats_mode=diff`;
+  function buildGifPaletteFilter(resolution, frameRate, repairReservedColorTransfer = false) {
+    return `${buildGifProcessingFilter(resolution, frameRate, repairReservedColorTransfer)},palettegen=max_colors=256:stats_mode=diff`;
   }
-  function buildGifEncodeFilterGraph(resolution, frameRate, selectedVideoStreamIndex) {
+  function buildGifEncodeFilterGraph(resolution, frameRate, selectedVideoStreamIndex, repairReservedColorTransfer = false) {
     const videoInput = selectedVideoStreamIndex === null || selectedVideoStreamIndex === void 0 ? "0:v:0" : `0:${selectedVideoStreamIndex}`;
-    return `[${videoInput}]${buildGifProcessingFilter(resolution, frameRate)}[gif_frames];[gif_frames][1:v:0]paletteuse=dither=sierra2_4a:diff_mode=rectangle[gif]`;
+    return `[${videoInput}]${buildGifProcessingFilter(resolution, frameRate, repairReservedColorTransfer)}[gif_frames];[gif_frames][1:v:0]paletteuse=dither=sierra2_4a:diff_mode=rectangle[gif]`;
   }
-  function buildGifPaletteArgs(input) {
+  function buildGifPaletteArgs(input, repairReservedColorTransfer = false) {
     const videoMap = input.selectedVideoStreamIndex === null || input.selectedVideoStreamIndex === void 0 ? "0:v:0" : `0:${input.selectedVideoStreamIndex}`;
     return [
       "-hide_banner",
@@ -659,7 +685,11 @@ ${redact(result.stderr, redactions)}`
       "-map",
       videoMap,
       "-vf",
-      buildGifPaletteFilter(input.resolution, input.frameRate),
+      buildGifPaletteFilter(
+        input.resolution,
+        input.frameRate,
+        repairReservedColorTransfer
+      ),
       "-frames:v",
       "1",
       "-an",
@@ -670,7 +700,7 @@ ${redact(result.stderr, redactions)}`
       input.temporaryPalettePath
     ];
   }
-  function buildGifEncodeArgs(input) {
+  function buildGifEncodeArgs(input, repairReservedColorTransfer = false) {
     return [
       "-hide_banner",
       "-nostdin",
@@ -689,7 +719,8 @@ ${redact(result.stderr, redactions)}`
       buildGifEncodeFilterGraph(
         input.resolution,
         input.frameRate,
-        input.selectedVideoStreamIndex
+        input.selectedVideoStreamIndex,
+        repairReservedColorTransfer
       ),
       "-map",
       "[gif]",
@@ -727,31 +758,45 @@ ${redact(result.stderr, redactions)}`
   async function exportGif(input, runtime) {
     var _a, _b;
     try {
-      await ((_a = runtime.verifySource) == null ? void 0 : _a.call(runtime));
-      const paletteResult = await runtime.run(
-        buildGifPaletteArgs(input),
-        "palette"
-      );
-      if (paletteResult.status !== 0) {
-        throw new GifExportError(
-          describeGifFailure(paletteResult, "palette"),
-          paletteResult,
+      let repairReservedColorTransfer = false;
+      for (; ; ) {
+        await ((_a = runtime.verifySource) == null ? void 0 : _a.call(runtime));
+        const paletteResult = await runtime.run(
+          buildGifPaletteArgs(input, repairReservedColorTransfer),
           "palette"
         );
-      }
-      await ((_b = runtime.verifySource) == null ? void 0 : _b.call(runtime));
-      const encodeResult = await runtime.run(
-        buildGifEncodeArgs(input),
-        "encode"
-      );
-      if (encodeResult.status !== 0) {
-        throw new GifExportError(
-          describeGifFailure(encodeResult, "encode"),
-          encodeResult,
+        if (paletteResult.status !== 0) {
+          if (!repairReservedColorTransfer && shouldSanitizeReservedColorTransfer(paletteResult.stderr)) {
+            runtime.cleanupTemporaryFiles();
+            repairReservedColorTransfer = true;
+            continue;
+          }
+          throw new GifExportError(
+            describeGifFailure(paletteResult, "palette"),
+            paletteResult,
+            "palette"
+          );
+        }
+        await ((_b = runtime.verifySource) == null ? void 0 : _b.call(runtime));
+        const encodeResult = await runtime.run(
+          buildGifEncodeArgs(input, repairReservedColorTransfer),
           "encode"
         );
+        if (encodeResult.status !== 0) {
+          if (!repairReservedColorTransfer && shouldSanitizeReservedColorTransfer(encodeResult.stderr)) {
+            runtime.cleanupTemporaryFiles();
+            repairReservedColorTransfer = true;
+            continue;
+          }
+          throw new GifExportError(
+            describeGifFailure(encodeResult, "encode"),
+            encodeResult,
+            "encode"
+          );
+        }
+        await runtime.promoteTemporaryFile();
+        return;
       }
-      await runtime.promoteTemporaryFile();
     } finally {
       runtime.cleanupTemporaryFiles();
     }
@@ -768,11 +813,12 @@ ${redact(result.stderr, redactions)}`
   function formatSeconds2(value) {
     return value.toFixed(6);
   }
-  function buildMp4Args(input, encoder) {
+  function buildMp4Args(input, encoder, repairReservedColorTransfer = false) {
     var _a, _b, _c, _d;
     const maximumWidth = (_a = input.maximumWidth) != null ? _a : 1920;
     const maximumHeight = (_b = input.maximumHeight) != null ? _b : 1080;
-    const videoFilter = ((_c = input.resolution) != null ? _c : "1080p") === "full" ? buildEvenFullResolutionFilter() : buildSarAwareScaleFilter(maximumWidth, maximumHeight);
+    const scaleFilter = ((_c = input.resolution) != null ? _c : "1080p") === "full" ? buildEvenFullResolutionFilter() : buildSarAwareScaleFilter(maximumWidth, maximumHeight);
+    const videoFilter = repairReservedColorTransfer ? sanitizeReservedColorTransfer(scaleFilter) : scaleFilter;
     const encoderArgs = encoder === "h264_videotoolbox" ? [
       "-c:v",
       "h264_videotoolbox",
@@ -866,14 +912,22 @@ ${redact(result.stderr, redactions)}`
     return exhaustedEncoders ? "Neither VideoToolbox nor libx264 could encode this clip. See the IINA log for details." : "FFmpeg could not encode this clip. See the IINA log for details.";
   }
   async function exportMp4(input, runtime) {
-    var _a, _b, _c;
+    var _a;
     const attempts = [];
-    await ((_a = runtime.verifySource) == null ? void 0 : _a.call(runtime));
-    const hardwareResult = await runtime.run(
-      buildMp4Args(input, "h264_videotoolbox"),
-      "h264_videotoolbox"
-    );
-    attempts.push(hardwareResult);
+    const runEncoder = async (encoder) => {
+      var _a2, _b;
+      await ((_a2 = runtime.verifySource) == null ? void 0 : _a2.call(runtime));
+      let result = await runtime.run(buildMp4Args(input, encoder), encoder);
+      attempts.push(result);
+      if (result.status !== 0 && shouldSanitizeReservedColorTransfer(result.stderr)) {
+        runtime.cleanupTemporaryFile();
+        await ((_b = runtime.verifySource) == null ? void 0 : _b.call(runtime));
+        result = await runtime.run(buildMp4Args(input, encoder, true), encoder);
+        attempts.push(result);
+      }
+      return result;
+    };
+    const hardwareResult = await runEncoder("h264_videotoolbox");
     if (hardwareResult.status === 0) {
       await runtime.promoteTemporaryFile();
       return { encoder: "h264_videotoolbox" };
@@ -885,13 +939,8 @@ ${redact(result.stderr, redactions)}`
         attempts
       );
     }
-    (_b = runtime.onSoftwareFallback) == null ? void 0 : _b.call(runtime);
-    await ((_c = runtime.verifySource) == null ? void 0 : _c.call(runtime));
-    const softwareResult = await runtime.run(
-      buildMp4Args(input, "libx264"),
-      "libx264"
-    );
-    attempts.push(softwareResult);
+    (_a = runtime.onSoftwareFallback) == null ? void 0 : _a.call(runtime);
+    const softwareResult = await runEncoder("libx264");
     if (softwareResult.status !== 0) {
       runtime.cleanupTemporaryFile();
       throw new Mp4ExportError(

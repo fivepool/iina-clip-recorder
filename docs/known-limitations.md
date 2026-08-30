@@ -1,6 +1,6 @@
 # Известные ограничения
 
-Актуально для IINA Clip Recorder `0.4.3`, IINA 1.4.4 build 168.
+Актуально для IINA Clip Recorder `0.4.4`, IINA 1.4.4 build 168.
 
 ## Источники
 
@@ -19,6 +19,9 @@
 - Известные BT.2020, PQ, HLG, SMPTE ST 2084 и повышенный signal peak
   отклоняются до первого маркера.
 - HDR → SDR tone mapping и сохранение HDR metadata не реализованы.
+- Точечный FFmpeg compatibility retry для reserved/null transfer metadata не
+  является tone mapping; источники с известной HDR metadata по-прежнему
+  отклоняются до первого маркера.
 - Это консервативная проверка по `video-dec-params` и `video-params`. Редкий
   HDR-файл с отсутствующей или ошибочной metadata теоретически может остаться
   нераспознанным.
@@ -44,8 +47,13 @@
 
 - IINA содержит FFmpeg libraries, но не предоставляет plugin API или
   executable для transcoding; нужен внешний FFmpeg.
-- Версия `0.4.3` требует FFmpeg 6.1 или новее: MP4 использует строковое
+- Версия `0.4.4` требует FFmpeg 6.1 или новее: MP4 использует строковое
   `-enc_time_base:v demux`, заменившее устаревшее числовое значение `-1`.
+- MP4 и оба GIF phase повторяются с metadata-only
+  `setparams=color_trc=unknown` только при точной FFmpeg swscale ошибке
+  reserved/null transfer metadata. Остальные filter/decode ошибки не
+  маскируются этим retry.
+- Этот regression path проверен с Homebrew FFmpeg 8.1.1 и 9.0.1.
 - Bare-name PATH lookup в IINA 1.4.4 ненадёжен, поэтому используются
   подтверждённые absolute candidates.
 - `iina.utils.exec` не возвращает PID и не предоставляет cancellation.

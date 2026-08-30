@@ -13,7 +13,7 @@
 - [ ] Финальный release gate — оставшаяся ручная GIF/dual/UI/error matrix
   в IINA 1.4.4. Clean-install baseline и packaged MP4 smoke уже пройдены.
 
-Текущий public beta target: `0.4.3`.
+Текущий public beta target: `0.4.4`.
 
 UI overlay в `0.4.2` приведён к единому умеренно матовому glass-стилю без
 добавления новых элементов или сообщений.
@@ -71,7 +71,7 @@ preview и действиями. Публичного plugin API для её с�
 VFR нельзя определить одним FPS. MP4 сохраняет timestamps через
 `-fps_mode:v passthrough -enc_time_base:v demux`; integration gate сравнивает
 frame PTS. Строковое значение `demux` заменило устаревшее числовое `-1` и
-совместимо с текущими Homebrew FFmpeg 8.x.
+проверено с Homebrew FFmpeg 8.1.1 и 9.0.1.
 
 ## FFmpeg discovery
 
@@ -114,6 +114,8 @@ idle → recording → preflighting → encoding → idle
 - 1080p: 1920×1080 box, SAR-aware square pixels, even, no upscale;
 - Full: source raster после autorotation, odd dimensions округляются;
 - no `-r`; VFR source time base;
+- точечный retry с metadata-only `setparams=color_trc=unknown` только при
+  exact swscale reserved/null transfer metadata failure;
 - encode в unique `@tmp`, затем no-overwrite promotion.
 
 Stream copy исключён: нужны точный range, scaling и совместимый output.
@@ -126,6 +128,7 @@ Stream copy исключён: нужны точный range, scaling и совм
 - separate input-limited palette and encode passes;
 - `palettegen=max_colors=256:stats_mode=diff`;
 - `paletteuse=dither=sierra2_4a:diff_mode=rectangle`;
+- тот же точечный reserved/null transfer metadata retry для palette и encode;
 - unique palette PNG;
 - cleanup в `finally`.
 
@@ -210,6 +213,7 @@ src/
   export-confirmation.ts
   export-preflight.ts
   disk-space.ts
+  color-metadata.ts
   ffmpeg.ts
   export-mp4.ts
   export-gif.ts
@@ -259,6 +263,7 @@ README.md
 | Source меняется внутри process | документировать: cancellation API отсутствует |
 | VFR quantization | source encoder time base + frame PTS integration test |
 | HDR выглядит сломанным | known HDR hard reject |
+| SDR reserved/null transfer metadata | exact swscale signature retry с metadata-only `setparams`; без tone mapping |
 | Wrong selected stream | strict ff-index map, ambiguous multi-video reject |
 | Rotation/SAR/odd | FFmpeg autorotation, SAR-aware filters, generated fixtures |
 | Host crash от menu/polling lifecycle | static menu, no mutation, no live polling |
@@ -287,6 +292,7 @@ Generated fixture verification:
 - rotation 90°;
 - anamorphic SAR 16:15;
 - odd 641×359;
+- 10-bit 4:2:2 SDR с reserved/null transfer metadata;
 - HDR10 tags;
 - Unicode path;
 - 35-second medium-duration source.
@@ -303,6 +309,7 @@ Media integration:
 - no-audio;
 - VFR PTS preservation via libx264;
 - GIF palette workflow.
+- MP4 и GIF reserved/null transfer regression на FFmpeg 8.1.1 и 9.0.1.
 
 Полная ручная матрица описана в
 [manual-test-plan.md](manual-test-plan.md).
@@ -312,7 +319,8 @@ Media integration:
 ```json
 {
   "identifier": "com.inkolor.iina-clip-recorder",
-  "version": "0.4.2",
+  "version": "0.4.4",
+  "ghVersion": 3,
   "author": {
     "name": "Maksim Arkatov",
     "url": "https://maksimarkatov.com"

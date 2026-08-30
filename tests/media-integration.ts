@@ -77,6 +77,7 @@ function encodeMp4(options: {
   readonly selectedEmbeddedAudioStreamIndex?: number;
   readonly hasEmbeddedAudio?: boolean;
   readonly includeAudio?: boolean;
+  readonly repairReservedColorTransfer?: boolean;
 }): void {
   run(
     ffmpeg,
@@ -97,6 +98,7 @@ function encodeMp4(options: {
         includeAudio: options.includeAudio ?? false,
       },
       "libx264",
+      options.repairReservedColorTransfer ?? false,
     ),
   );
 }
@@ -216,6 +218,24 @@ for (const delta of inputDeltas) {
   assert.ok(outputDeltas.has(delta), `output preserves ${delta}s VFR interval`);
 }
 
+const reservedTransferInput = fixture("16 — ProRes reserved transfer.mov");
+const repairedMp4Output = path.join(results, "reserved-transfer.mp4");
+encodeMp4({
+  input: reservedTransferInput,
+  output: repairedMp4Output,
+  resolution: "full",
+  repairReservedColorTransfer: true,
+});
+const repairedMp4Video = video(repairedMp4Output);
+assert.equal(repairedMp4Video.pix_fmt, "yuv420p");
+assert.equal(repairedMp4Video.color_space, "bt709");
+assert.equal(repairedMp4Video.color_primaries, "bt709");
+assert.ok(
+  repairedMp4Video.color_transfer === undefined ||
+    repairedMp4Video.color_transfer === "unknown",
+  "reserved transfer metadata is removed from the MP4 output",
+);
+
 const gifInput = fixture("06 — below 720p.mp4");
 const gifPalette = path.join(results, "palette.png");
 const gifOutput = path.join(results, "clip.gif");
@@ -235,5 +255,22 @@ assert.equal(video(gifOutput).height, 360);
 assert.equal(video(gifOutput).nb_frames, "18");
 assert.equal(video(gifOutput).duration, "1.500000");
 fs.rmSync(gifPalette, { force: true });
+
+const reservedGifPalette = path.join(results, "reserved-palette.png");
+const reservedGifOutput = path.join(results, "reserved-transfer.gif");
+const reservedGifCommand = {
+  sourcePath: reservedTransferInput,
+  temporaryOutputPath: reservedGifOutput,
+  temporaryPalettePath: reservedGifPalette,
+  range: { start: 0, end: 1, duration: 1 },
+  resolution: "720p" as const,
+  frameRate: "12" as const,
+  selectedVideoStreamIndex: 0,
+};
+run(ffmpeg, buildGifPaletteArgs(reservedGifCommand, true));
+run(ffmpeg, buildGifEncodeArgs(reservedGifCommand, true));
+assert.equal(video(reservedGifOutput).pix_fmt, "bgra");
+assert.equal(video(reservedGifOutput).nb_frames, "12");
+fs.rmSync(reservedGifPalette, { force: true });
 
 console.log(`Stage 5 media integration passed: ${results}`);

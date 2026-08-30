@@ -1,9 +1,9 @@
 {
   "name": "IINA Clip Recorder",
   "identifier": "com.inkolor.iina-clip-recorder",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "ghRepo": "fivepool/iina-clip-recorder",
-  "ghVersion": 2,
+  "ghVersion": 3,
   "description": "Mark a range on the media timeline and export it as MP4, GIF, or both.",
   "author": {
     "name": "Maksim Arkatov",

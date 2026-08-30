@@ -1,4 +1,8 @@
 import { buildSarAwareScaleFilter } from "./dimensions";
+import {
+  sanitizeReservedColorTransfer,
+  shouldSanitizeReservedColorTransfer,
+} from "./color-metadata";
 import type { GifFrameRate, GifResolution } from "./preferences";
 import type { ClipRange } from "./types";
 
@@ -58,6 +62,7 @@ export function buildGifFullResolutionFilter(): string {
 export function buildGifProcessingFilter(
   resolution: GifResolution,
   frameRate: GifFrameRate,
+  repairReservedColorTransfer = false,
 ): string {
   const scaleFilter =
     resolution === "720p"
@@ -71,20 +76,24 @@ export function buildGifProcessingFilter(
   const processingFilters =
     frameRate === "12" ? `fps=fps=12,${scaleFilter}` : scaleFilter;
 
-  return processingFilters;
+  return repairReservedColorTransfer
+    ? sanitizeReservedColorTransfer(processingFilters)
+    : processingFilters;
 }
 
 export function buildGifPaletteFilter(
   resolution: GifResolution,
   frameRate: GifFrameRate,
+  repairReservedColorTransfer = false,
 ): string {
-  return `${buildGifProcessingFilter(resolution, frameRate)},palettegen=max_colors=256:stats_mode=diff`;
+  return `${buildGifProcessingFilter(resolution, frameRate, repairReservedColorTransfer)},palettegen=max_colors=256:stats_mode=diff`;
 }
 
 export function buildGifEncodeFilterGraph(
   resolution: GifResolution,
   frameRate: GifFrameRate,
   selectedVideoStreamIndex?: number | null,
+  repairReservedColorTransfer = false,
 ): string {
   const videoInput =
     selectedVideoStreamIndex === null ||
@@ -92,7 +101,7 @@ export function buildGifEncodeFilterGraph(
       ? "0:v:0"
       : `0:${selectedVideoStreamIndex}`;
   return (
-    `[${videoInput}]${buildGifProcessingFilter(resolution, frameRate)}[gif_frames];` +
+    `[${videoInput}]${buildGifProcessingFilter(resolution, frameRate, repairReservedColorTransfer)}[gif_frames];` +
     "[gif_frames][1:v:0]paletteuse=dither=sierra2_4a:diff_mode=rectangle[gif]"
   );
 }
@@ -102,7 +111,10 @@ export function buildGifEncodeFilterGraph(
  * palettegen emits its single frame only at EOF, so an output-side -t would
  * otherwise make FFmpeg scan from the marker to the end of the whole movie.
  */
-export function buildGifPaletteArgs(input: GifCommandInput): string[] {
+export function buildGifPaletteArgs(
+  input: GifCommandInput,
+  repairReservedColorTransfer = false,
+): string[] {
   const videoMap =
     input.selectedVideoStreamIndex === null ||
     input.selectedVideoStreamIndex === undefined
@@ -123,7 +135,11 @@ export function buildGifPaletteArgs(input: GifCommandInput): string[] {
     "-map",
     videoMap,
     "-vf",
-    buildGifPaletteFilter(input.resolution, input.frameRate),
+    buildGifPaletteFilter(
+      input.resolution,
+      input.frameRate,
+      repairReservedColorTransfer,
+    ),
     "-frames:v",
     "1",
     "-an",
@@ -136,7 +152,10 @@ export function buildGifPaletteArgs(input: GifCommandInput): string[] {
 }
 
 /** Build the second pass using the already-generated palette image. */
-export function buildGifEncodeArgs(input: GifCommandInput): string[] {
+export function buildGifEncodeArgs(
+  input: GifCommandInput,
+  repairReservedColorTransfer = false,
+): string[] {
   return [
     "-hide_banner",
     "-nostdin",
@@ -156,6 +175,7 @@ export function buildGifEncodeArgs(input: GifCommandInput): string[] {
       input.resolution,
       input.frameRate,
       input.selectedVideoStreamIndex,
+      repairReservedColorTransfer,
     ),
     "-map",
     "[gif]",
@@ -220,32 +240,53 @@ export async function exportGif(
   runtime: GifExportRuntime,
 ): Promise<void> {
   try {
-    await runtime.verifySource?.();
-    const paletteResult = await runtime.run(
-      buildGifPaletteArgs(input),
-      "palette",
-    );
-    if (paletteResult.status !== 0) {
-      throw new GifExportError(
-        describeGifFailure(paletteResult, "palette"),
-        paletteResult,
+    let repairReservedColorTransfer = false;
+
+    for (;;) {
+      await runtime.verifySource?.();
+      const paletteResult = await runtime.run(
+        buildGifPaletteArgs(input, repairReservedColorTransfer),
         "palette",
       );
-    }
+      if (paletteResult.status !== 0) {
+        if (
+          !repairReservedColorTransfer &&
+          shouldSanitizeReservedColorTransfer(paletteResult.stderr)
+        ) {
+          runtime.cleanupTemporaryFiles();
+          repairReservedColorTransfer = true;
+          continue;
+        }
+        throw new GifExportError(
+          describeGifFailure(paletteResult, "palette"),
+          paletteResult,
+          "palette",
+        );
+      }
 
-    await runtime.verifySource?.();
-    const encodeResult = await runtime.run(
-      buildGifEncodeArgs(input),
-      "encode",
-    );
-    if (encodeResult.status !== 0) {
-      throw new GifExportError(
-        describeGifFailure(encodeResult, "encode"),
-        encodeResult,
+      await runtime.verifySource?.();
+      const encodeResult = await runtime.run(
+        buildGifEncodeArgs(input, repairReservedColorTransfer),
         "encode",
       );
+      if (encodeResult.status !== 0) {
+        if (
+          !repairReservedColorTransfer &&
+          shouldSanitizeReservedColorTransfer(encodeResult.stderr)
+        ) {
+          runtime.cleanupTemporaryFiles();
+          repairReservedColorTransfer = true;
+          continue;
+        }
+        throw new GifExportError(
+          describeGifFailure(encodeResult, "encode"),
+          encodeResult,
+          "encode",
+        );
+      }
+      await runtime.promoteTemporaryFile();
+      return;
     }
-    await runtime.promoteTemporaryFile();
   } finally {
     runtime.cleanupTemporaryFiles();
   }

@@ -101,6 +101,15 @@ rm -f "$OUT/.rotation-base.mp4"
   -c:v libx264 -preset ultrafast -crf 32 -pix_fmt yuv420p -an \
   "$OUT/15 — 305 second warning source.mp4"
 
+# ProRes/MOV can carry reserved transfer value 3. FFmpeg 8+ exposes it as
+# `(null)` or `reserved` and rejects 10-bit to 8-bit conversion until that
+# invalid metadata value is sanitized.
+"$FFMPEG" -hide_banner -loglevel error -y \
+  -f lavfi -i "testsrc2=size=640x360:rate=24:duration=2" \
+  -vf "format=yuv422p10le,setparams=colorspace=bt709:color_primaries=bt709:color_trc=3" \
+  -c:v prores_ks -profile:v 2 -an \
+  "$OUT/16 — ProRes reserved transfer.mov"
+
 "$FFMPEG" -hide_banner -loglevel error -y \
   -f lavfi -i "testsrc2=size=640x360:rate=24:duration=3" \
   -f lavfi -i "sine=frequency=523.25:sample_rate=48000:duration=3" \

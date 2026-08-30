@@ -17,7 +17,8 @@ Tested with IINA 1.4.4 build 168 on macOS.
 ## Requirements
 
 - macOS and IINA.
-- [FFmpeg](https://ffmpeg.org/) 6.1 or newer, installed separately.
+- [FFmpeg](https://ffmpeg.org/) 6.1 or newer, installed separately. The export
+  pipeline is regression-tested with Homebrew FFmpeg 8.1.1 and 9.0.1.
 
 With Homebrew:
 

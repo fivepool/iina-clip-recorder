@@ -137,6 +137,12 @@ output pixels × estimated frames × 0.30 bytes/pixel-frame
 fast. Не связанные с encoder ошибки, например disk full, не маскируются
 fallback.
 
+Если FFmpeg возвращает точную сигнатуру swscale для reserved/null transfer
+metadata, MP4-команда повторяется с metadata-only
+`setparams=color_trc=unknown` перед scale filter. Этот узкий compatibility retry
+не выполняет tone mapping и не применяется к другим ошибкам. Источники с
+известной HDR metadata по-прежнему отклоняются до первого маркера.
+
 ## GIF pipeline
 
 Оба прохода используют один range и выбранный video stream.
@@ -158,6 +164,12 @@ timestamps передаются GIF muxer; формат округляет delay
 
 Palette и GIF output имеют уникальные `@tmp` имена. Cleanup выполняется в
 `finally`.
+
+Palette и encode passes используют тот же точечный retry с
+`setparams=color_trc=unknown` только для точной swscale reserved/null transfer
+ошибки. При ошибке encode временные файлы очищаются и весь двухпроходный
+workflow повторяется в совместимом filter mode, чтобы palette и GIF строились
+одинаковой цепочкой.
 
 ## Dual export и promotion
 
@@ -234,6 +246,7 @@ src/export-lifecycle.ts     EOF/playlist generation policy
 src/export-confirmation.ts  компактная confirmation model/copy
 src/export-preflight.ts     estimates и risk thresholds
 src/disk-space.ts           df parser и filesystem model
+src/color-metadata.ts       точечный FFmpeg color metadata retry
 src/export-mp4.ts           MP4 argv/fallback
 src/export-gif.ts           GIF palette workflow
 src/dimensions.ts           scale policies
@@ -256,12 +269,12 @@ src/notifications.ts        result models/messages
 - repository README;
 - FFmpeg.
 
-Manifest `0.4.3`:
+Manifest `0.4.4`:
 
 ```text
 identifier: com.inkolor.iina-clip-recorder
 ghRepo: fivepool/iina-clip-recorder
-ghVersion: 2
+ghVersion: 3
 author: Maksim Arkatov
 url: https://maksimarkatov.com
 ```

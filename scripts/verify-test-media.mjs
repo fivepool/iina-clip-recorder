@@ -117,6 +117,12 @@ const gifWarning = probe("14 — 35 second warning source.mp4");
 assert.ok(Number(gifWarning.format.duration) >= 35);
 const longWarning = probe("15 — 305 second warning source.mp4");
 assert.ok(Number(longWarning.format.duration) >= 305);
+const reservedTransfer = video(probe("16 — ProRes reserved transfer.mov"));
+assert.equal(reservedTransfer.codec_name, "prores");
+assert.equal(reservedTransfer.pix_fmt, "yuv422p10le");
+assert.equal(reservedTransfer.color_space, "bt709");
+assert.equal(reservedTransfer.color_primaries, "bt709");
+assert.equal(reservedTransfer.color_transfer, "reserved");
 assert.ok(
   fs.existsSync(
     path.join(directory, "Unicode path 🎬", "Юникод — тест 🎞️.mp4"),
